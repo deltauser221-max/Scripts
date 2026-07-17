@@ -139,8 +139,8 @@ end
 -- CREATE WINDOW
 -- ================================================================
 local Window = Fluent:CreateWindow({
-    Title       = "Escape from Mr. Island Beast",
-    SubTitle    = "By GAMER",
+    Title       = "Some people  don't Trust",
+    SubTitle    = "ON GAMER",
     TabWidth    = 160,
     Size        = UDim2.fromOffset(550, 460),
     Acrylic     = false,
