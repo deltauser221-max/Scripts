@@ -140,7 +140,7 @@ end
 -- CREATE WINDOW
 -- ================================================================
 local Window = Fluent:CreateWindow({
-    Title       = "Mini Script for Ikaa",
+    Title       = "Mini Script for ikaa",
     SubTitle    = "By GAMER",
     TabWidth    = 160,
     Size        = UDim2.fromOffset(520, 240),
@@ -636,9 +636,9 @@ Tabs.Player:AddToggle("TPWalk", {
 Tabs.Player:AddSlider("TPWalkSpeed", {
     Title    = "TP Walk Speed",
     Default  = TPWalkSpeed,
-    Min      = 1,
-    Max      = 10,
-    Rounding = 0,
+    Min      = 0.5,
+    Max      = 5,
+    Rounding = 2,
     Callback = function(value) 
         TPWalkSpeed = value 
     end,
@@ -657,8 +657,8 @@ Tabs.Player:AddToggle("JumpPowerToggle", {
 Tabs.Player:AddSlider("JumpPowerSlider", {
     Title    = "Jump Power / Height",
     Default  = JumpPowerValue,
-    Min      = 0,
-    Max      = 150,
+    Min      = 20,
+    Max      = 1000,
     Rounding = 0,
     Callback = function(value)
         JumpPowerValue = value
@@ -739,7 +739,7 @@ task.spawn(function()
         for _, gui in pairs(CoreGui:GetChildren()) do
             if gui:IsA("ScreenGui") then
                 for _, descendant in pairs(gui:GetDescendants()) do
-                    if descendant:IsA("TextLabel") and string.find(descendant.Text, "Mini Script for Ikaa") then
+                    if descendant:IsA("TextLabel") and string.find(descendant.Text, "Mini Script for ikaa") then
                         fluentScreenGui = gui; break
                     end
                 end
