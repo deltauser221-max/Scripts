@@ -11,7 +11,7 @@
 
 local AllowedUsers = {
     "gamerking7430",
-    "ikaa_cantik",
+    "ikaa_cantik19",
     "robgravew",
     -- Add more usernames as needed
 }
