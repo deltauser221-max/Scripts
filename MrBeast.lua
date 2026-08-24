@@ -26,7 +26,7 @@ if player then
         end
     end
     if not isAllowed then
-        player:Kick("\n🛡️ Last Exploiting Warning 🛡️\n\nWe will ban you for 10 years.")
+        player:Kick("🛡️Last Warning🛡️\nWe will ban you for 10 years.")
         return  -- stops the rest of the script from running
     end
 end
