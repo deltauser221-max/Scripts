@@ -140,8 +140,8 @@ end
 -- CREATE WINDOW
 -- ================================================================
 local Window = Fluent:CreateWindow({
-    Title       = "Mini Script for ikaa",
-    SubTitle    = "By GAMER",
+    Title       = "Mr Beast Island Escape",
+    SubTitle    = "By TheScripter",
     TabWidth    = 160,
     Size        = UDim2.fromOffset(520, 240),
     Acrylic     = false,
@@ -739,7 +739,7 @@ task.spawn(function()
         for _, gui in pairs(CoreGui:GetChildren()) do
             if gui:IsA("ScreenGui") then
                 for _, descendant in pairs(gui:GetDescendants()) do
-                    if descendant:IsA("TextLabel") and string.find(descendant.Text, "Mini Script for ikaa") then
+                    if descendant:IsA("TextLabel") and string.find(descendant.Text, "Mr Beast Island Escape") then
                         fluentScreenGui = gui; break
                     end
                 end
