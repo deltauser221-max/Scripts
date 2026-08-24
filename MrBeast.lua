@@ -5,6 +5,31 @@
 -- variables renamed, loops rewritten idiomatically.
 -- Behaviour is identical to the original obfuscated version.
 -- ================================================================
+-- ============================================================
+-- USERNAME WHITELIST – Kicks if not in the list
+-- ============================================================
+
+local AllowedUsers = {
+    "gamerking7430",
+    "ikaa_cantik",
+    "robgrave7",
+    -- Add more usernames as needed
+}
+
+local player = game:GetService("Players").LocalPlayer
+if player then
+    local isAllowed = false
+    for _, name in ipairs(AllowedUsers) do
+        if player.Name == name then
+            isAllowed = true
+            break
+        end
+    end
+    if not isAllowed then
+        player:Kick("\n🛡️ Last Exploiting Warning 🛡️\n\nWe will ban you for 10 years.")
+        return  -- stops the rest of the script from running
+    end
+end
 
 -- ── Load Fluent UI library ───────────────────────────────────────
 local Fluent = loadstring(game:HttpGet(
@@ -782,3 +807,17 @@ InterfaceManager:BuildInterfaceSection(UISettingsTab)
 -- STARTUP NOTIFICATION
 -- ================================================================
 notify("Script Loaded", "Mobile UI loaded! Movement is now free.", 5)
+
+if player then
+    local isAllowed = false
+    for _, name in ipairs(AllowedUsers) do
+        if player.Name == name then
+            isAllowed = true
+            break
+        end
+    end
+    if not isAllowed then
+        player:Kick("\n🛡️ Last Exploiting Warning 🛡️\n\nWe will ban you for 10 years.")
+        return  -- stops the rest of the script from running
+    end
+end
