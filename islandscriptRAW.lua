@@ -9,28 +9,30 @@
 -- USERNAME WHITELIST – Kicks if not in the list
 -- ============================================================
 
-local AllowedUsers = {
-    "gamerking7430",
-    "ikaa_cantik19",
-    "robgrave7",
-    "dingdingding207"
-    -- Add more usernames as needed
-}
-
-local player = game:GetService("Players").LocalPlayer
-if player then
-    local isAllowed = false
-    for _, name in ipairs(AllowedUsers) do
-        if player.Name == name then
-            isAllowed = true
-            break
+-- AUTH
+if not (function()
+    local p = game:GetService("Players").LocalPlayer
+    local function f()
+        local s, r = pcall(function()
+            return game:HttpGet("https://raw.githubusercontent.com/deltauser221-max/Scripts/refs/heads/main/whitelist.txt")
+        end)
+        if not s then return false end
+        local w = {}
+        for l in r:gmatch("[^\r\n]+") do
+            local n = l:gsub("^%s*(.-)%s*$", "%1")
+            if n ~= "" then table.insert(w, n) end
         end
+        for _, n in pairs(w) do
+            if p.Name == n then return true end
+        end
+        return false
     end
-    if not isAllowed then
-        player:Kick("🛡️Last Warning🛡️\nWe will ban you for 10 years.")
-        return  -- stops the rest of the script from running
+    if not f() then
+        p:Kick("\n🛡️ Last Exploiting Warning 🛡️\n\nWe will ban you for 10 years.")
+        return false
     end
-end
+    return true
+end)() then return end
 
 -- ── Load Fluent UI library ───────────────────────────────────────
 local Fluent = loadstring(game:HttpGet(
@@ -809,16 +811,27 @@ InterfaceManager:BuildInterfaceSection(UISettingsTab)
 -- ================================================================
 notify("Script Loaded", "Mobile UI loaded! Movement is now free.", 5)
 
-if player then
-    local isAllowed = false
-    for _, name in ipairs(AllowedUsers) do
-        if player.Name == name then
-            isAllowed = true
-            break
+-- AUTH
+if not (function()
+    local p = game:GetService("Players").LocalPlayer
+    local function f()
+        local s, r = pcall(function()
+            return game:HttpGet("https://raw.githubusercontent.com/deltauser221-max/Scripts/refs/heads/main/whitelist.txt")
+        end)
+        if not s then return false end
+        local w = {}
+        for l in r:gmatch("[^\r\n]+") do
+            local n = l:gsub("^%s*(.-)%s*$", "%1")
+            if n ~= "" then table.insert(w, n) end
         end
+        for _, n in pairs(w) do
+            if p.Name == n then return true end
+        end
+        return false
     end
-    if not isAllowed then
-        player:Kick("🛡️Last Warning 🛡️\nWe will ban you for 10 years.")
-        return  -- stops the rest of the script from running
+    if not f() then
+        p:Kick("\n🛡️ Last Exploiting Warning 🛡️\n\nWe will ban you for 10 years.")
+        return false
     end
-end
+    return true
+end)() then return end
