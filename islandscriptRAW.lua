@@ -28,7 +28,7 @@ if not (function()
         return false
     end
     if not f() then
-        p:Kick("\n🛡️ Last Exploiting Warning 🛡️\n\nWe will ban you for 10 years.")
+        p:Kick("🛡️Last Exploiting Warning🛡️\nWe will ban you for 10 years.")
         return false
     end
     return true
@@ -830,7 +830,7 @@ if not (function()
         return false
     end
     if not f() then
-        p:Kick("\n🛡️ Last Exploiting Warning 🛡️\n\nWe will ban you for 10 years.")
+        p:Kick("🛡️Last Exploiting Warning🛡️\nWe will ban you for 10 years.")
         return false
     end
     return true
