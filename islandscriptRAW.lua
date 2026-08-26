@@ -428,12 +428,11 @@ Tabs.Combat:AddToggle("AutoKill", {
         State.AutoKill = enabled
         task.spawn(function()
             while State.AutoKill do
-                task.wait(0.1)
                 local char = getCharacter()
                 local entitiesFolder = getGameFolder("Entities")
                 if char and entitiesFolder then
                     for _, entity in pairs(entitiesFolder:GetChildren()) do
-                        if entity:IsA("Model") and entity:FindFirstChild("HumanoidRootPart") and entity:FindFirstChild("Humanoid") and entity.Humanoid.Health > 0 then
+                        if entity:IsA("Model") and entity:FindFirstChild("HumanoidRootPart") and entity:FindFirstChild("Humanoid") then
                             local dist = (char.HumanoidRootPart.Position - entity.HumanoidRootPart.Position).Magnitude
                             if dist <= State.KillRange then
                                 Remotes.meleeHit:FireServer({entity}, {})
