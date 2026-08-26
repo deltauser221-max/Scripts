@@ -428,7 +428,7 @@ Tabs.Combat:AddToggle("AutoKill", {
         State.AutoKill = enabled
         task.spawn(function()
             while State.AutoKill do
-                -- task.wait(0.06)
+                task.wait(0.06)
                 local char = getCharacter()
                 local entitiesFolder = getGameFolder("Entities")
                 if char and entitiesFolder then
