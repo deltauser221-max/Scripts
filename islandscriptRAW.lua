@@ -398,7 +398,7 @@ Tabs.Farm:AddToggle("AutoCut", {
         State.AutoCutTree = enabled
         task.spawn(function()
             while State.AutoCutTree do
-                task.wait(0.001)
+                task.wait(0.1)
                 local char = getCharacter()
                 local staticFolder = getGameFolder("Static")
                 if char and staticFolder then
