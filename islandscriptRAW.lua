@@ -689,7 +689,6 @@ Toggles.AutoOpenCollect = Tabs.Chests:AddToggle("AutoOpenCollect", {
         State.AutoOpenCollect = enabled
         if enabled then
             local startPos = getCharacter() and getCharacter().HumanoidRootPart.CFrame
-            Toggles.BestWeapon:SetValue(true)
             task.spawn(function()
                 local visited = {}
                 while State.AutoOpenCollect do
@@ -744,7 +743,6 @@ Toggles.AutoOpenCollect = Tabs.Chests:AddToggle("AutoOpenCollect", {
                                                         task.wait(0.1)
                                                         char.HumanoidRootPart.CFrame = savedCFrame
                                                         cam.CameraType = Enum.CameraType.Custom
-                                                        Toggles.BestWeapon:SetValue(true)
                                                     end
                                                 end
                                             end
@@ -758,7 +756,6 @@ Toggles.AutoOpenCollect = Tabs.Chests:AddToggle("AutoOpenCollect", {
                     end
                 end
                 if startPos and getCharacter() then getCharacter().HumanoidRootPart.CFrame = startPos end
-                Toggles.BestWeapon:SetValue(false)
             end)
         end
     end,
