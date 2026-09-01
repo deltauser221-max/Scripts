@@ -528,3 +528,8 @@ Fluent:Notify({
 })
 
 print("Player Tab script finished loading")
+local UISettingsTab = Window:AddTab({ Title = "UI Settings", Icon = "lucide/settings-2" })
+
+InterfaceManager:SetLibrary(Fluent)
+InterfaceManager:SetFolder("FluentCustom/Settings")
+InterfaceManager:BuildInterfaceSection(UISettingsTab)
