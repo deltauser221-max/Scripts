@@ -49,7 +49,7 @@ local State = {
 
 -- Store original values to restore on toggle off
 local OriginalWalkSpeed = 16
-local OriginalJumpPower = 50
+local OriginalJumpPower = 20
 
 -- ── ESP Data ──────────────────────────────────────────────────────
 local ESPData = {}
@@ -417,7 +417,7 @@ PlayerTab:AddSlider("WalkSlider", {
     Description = "Adjust speed (default 16)",
     Default = 40,
     Min = 1,
-    Max = 100,
+    Max = 60,
     Rounding = 1,
     Callback = function(value)
         State.WalkValue = value
@@ -451,7 +451,7 @@ PlayerTab:AddSlider("JumpSlider", {
     Description = "JumpPower or JumpHeight (depending on game)",
     Default = 20,
     Min = 0,
-    Max = 60,
+    Max = 50,
     Rounding = 0,
     Callback = function(value)
         State.JumpValue = value
@@ -528,6 +528,7 @@ Fluent:Notify({
 })
 
 print("Player Tab script finished loading")
+
 local UISettingsTab = Window:AddTab({ Title = "UI Settings", Icon = "lucide/settings-2" })
 
 InterfaceManager:SetLibrary(Fluent)
