@@ -1,6 +1,7 @@
 -- ======================================================================
--- Player Tab – ESP (Team Aware) + WalkSpeed + Jump Power
--- Distance on top, Name below. Labels elevated for visibility.
+-- Player Tab – ESP (Team Aware) + WalkSpeed + Jump Power + Auto Refresh
+-- Fully respawn‑proof, team colors update dynamically.
+-- Auto Refresh toggles ESP off/on every 5 seconds.
 -- ======================================================================
 
 print("Player Tab script started")
@@ -11,17 +12,16 @@ local Fluent = loadstring(game:HttpGet(
 ))()
 
 -- ── Services ─────────────────────────────────────────────────────────
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local CoreGui = game:GetService("CoreGui")
+local LocalPlayer = Players.LocalPlayer
 -- ── Services ─────────────────────────────────────────────────
 local Services = {
     RunService           = game:GetService("RunService"),
     UserInputService     = game:GetService("UserInputService"),
     ProximityPrompt      = game:GetService("ProximityPromptService")
 }
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local CoreGui = game:GetService("CoreGui")
-
-local LocalPlayer = Players.LocalPlayer
 
 -- ── Helpers ──────────────────────────────────────────────────
 Services.ProximityPrompt.PromptButtonHoldBegan:Connect(function(prompt)
@@ -37,17 +37,17 @@ end)
 Services.ProximityPrompt.PromptTriggered:Connect(function(prompt)
     -- print("[PoC] Prompt Triggered (instant):", prompt:GetFullName())
 end)
-
 -- ── State ────────────────────────────────────────────────────────────
 local State = {
-    ESPEnabled = false,
-    WalkEnabled = false,
-    WalkValue = 40,
-    JumpEnabled = false,
-    JumpValue = 20,
+    ESPEnabled          = false,
+    WalkEnabled         = false,
+    WalkValue           = 40,
+    JumpEnabled         = false,
+    JumpValue           = 20,
+    AutoRefreshEnabled  = false,
 }
 
--- Store original values to restore on toggle off
+-- Store current defaults – updated on each respawn
 local OriginalWalkSpeed = 16
 local OriginalJumpPower = 20
 
@@ -64,8 +64,37 @@ local function getHumanoid(character)
     return character and character:FindFirstChildOfClass("Humanoid")
 end
 
+-- Robust team detection: checks TeamColor first, then Team.
 local function isTeammate(plr)
-    return plr.TeamColor == LocalPlayer.TeamColor and LocalPlayer.TeamColor ~= BrickColor.new("White")
+    if not plr then return false end
+    local myColor = LocalPlayer.TeamColor
+    local theirColor = plr.TeamColor
+    if myColor and theirColor and myColor == theirColor then
+        return true
+    end
+    -- Fallback: check Team property
+    local myTeam = LocalPlayer.Team
+    local theirTeam = plr.Team
+    if myTeam and theirTeam and myTeam == theirTeam then
+        return true
+    end
+    return false
+end
+
+-- ── Save Game Defaults (called on each respawn) ─────────────────
+
+local function saveOriginalValues()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hum = getHumanoid(char)
+    if hum then
+        OriginalWalkSpeed = hum.WalkSpeed
+        if hum.UseJumpPower then
+            OriginalJumpPower = hum.JumpPower
+        else
+            OriginalJumpPower = hum.JumpHeight or 50
+        end
+    end
 end
 
 -- ── ESP Creation ──────────────────────────────────────────────────
@@ -89,11 +118,8 @@ local function createESPForPlayer(plr)
     local highlight = Instance.new("Highlight")
     highlight.Name = "ESP_Highlight"
     highlight.Parent = char
-    if isTeammate(plr) then
-        highlight.FillColor = Color3.fromRGB(0, 255, 0)   -- Green
-    else
-        highlight.FillColor = Color3.fromRGB(255, 50, 50) -- Red
-    end
+    local isTeam = isTeammate(plr)
+    highlight.FillColor = isTeam and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 50, 50)
     highlight.FillTransparency = 0.4
     highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
     highlight.OutlineTransparency = 0.2
@@ -107,8 +133,8 @@ local function createESPForPlayer(plr)
     billboard.Name = "ESP_Billboard"
     billboard.Parent = CoreGui
     billboard.Adornee = head
-    billboard.Size = UDim2.new(0, 200, 0, 70)      -- taller to fit two lines
-    billboard.StudsOffset = Vector3.new(0, 4.5, 0) -- higher for visibility
+    billboard.Size = UDim2.new(0, 200, 0, 70)
+    billboard.StudsOffset = Vector3.new(0, 4.5, 0)
     billboard.AlwaysOnTop = true
 
     local label = Instance.new("TextLabel")
@@ -120,14 +146,15 @@ local function createESPForPlayer(plr)
     label.TextColor3 = Color3.new(1, 1, 1)
     label.TextStrokeTransparency = 0.5
     label.TextStrokeColor3 = Color3.new(0, 0, 0)
-    label.TextYAlignment = Enum.TextYAlignment.Top    -- align to top of billboard
-    label.Text = "0\n" .. plr.Name                    -- distance top, name bottom
+    label.TextYAlignment = Enum.TextYAlignment.Top
+    label.Text = "0\n" .. plr.Name
 
     ESPData[plr] = {
         Highlight = highlight,
         Billboard = billboard,
         Label = label,
         Character = char,
+        LastTeammate = isTeam,
     }
 end
 
@@ -142,7 +169,7 @@ local function removeESPForPlayer(plr)
     end
 end
 
--- ── Update all ESP labels (distance) ──────────────────────────────
+-- ── Update all ESP (distance & team color) ────────────────────────
 
 local function updateAllESP()
     if not State.ESPEnabled then return end
@@ -151,22 +178,33 @@ local function updateAllESP()
     if not myRoot then return end
 
     for plr, data in pairs(ESPData) do
-        -- Recreate if character changed
-        if plr.Character ~= data.Character then
+        -- Recreate if character changed or is nil
+        if not data.Character or plr.Character ~= data.Character then
             createESPForPlayer(plr)
             data = ESPData[plr]
             if not data then continue end
         end
 
+        -- Update distance
         local targetRoot = getRoot(plr.Character)
         if targetRoot then
             local dist = math.floor((myRoot.Position - targetRoot.Position).Magnitude)
             data.Label.Text = dist .. "\n" .. plr.Name
         end
+
+        -- Update team color if status changed
+        local nowTeammate = isTeammate(plr)
+        if data.LastTeammate ~= nowTeammate then
+            data.LastTeammate = nowTeammate
+            local highlight = data.Highlight
+            if highlight then
+                highlight.FillColor = nowTeammate and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 50, 50)
+            end
+        end
     end
 end
 
--- ── Refresh ESP ──────────────────────────────────────────────────
+-- ── Refresh ESP (full rebuild) ──────────────────────────────────
 
 local function refreshESP()
     for plr in pairs(ESPData) do removeESPForPlayer(plr) end
@@ -177,7 +215,7 @@ local function refreshESP()
     end
 end
 
--- ── Event Listeners ──────────────────────────────────────────────
+-- ── Event Listeners for ESP ──────────────────────────────────────
 
 Players.PlayerAdded:Connect(function(plr)
     if State.ESPEnabled and plr ~= LocalPlayer then createESPForPlayer(plr) end
@@ -187,14 +225,15 @@ Players.PlayerRemoving:Connect(function(plr)
     removeESPForPlayer(plr)
 end)
 
-local function onCharacterAdded(plr)
+-- Other players respawn
+local function onOtherPlayerCharacterAdded(plr)
     if State.ESPEnabled and plr ~= LocalPlayer then createESPForPlayer(plr) end
 end
 
 for _, plr in ipairs(Players:GetPlayers()) do
     if plr ~= LocalPlayer then
         plr.CharacterAdded:Connect(function()
-            onCharacterAdded(plr)
+            onOtherPlayerCharacterAdded(plr)
         end)
     end
 end
@@ -220,6 +259,27 @@ local function startUpdateLoop()
     end
 end
 
+-- ── Auto Refresh ESP Loop ────────────────────────────────────────
+
+local autoRefreshConnection = nil
+
+local function autoRefreshLoop()
+    while State.AutoRefreshEnabled do
+        if State.ESPEnabled and ESPToggleRef then
+            -- Toggle ESP off
+            ESPToggleRef:SetValue(false)
+            task.wait(0.1)
+            -- Toggle ESP back on
+            ESPToggleRef:SetValue(true)
+        end
+        -- Wait 5 seconds (50 * 0.1)
+        for _ = 1, 50 do
+            if not State.AutoRefreshEnabled then return end
+            task.wait(0.1)
+        end
+    end
+end
+
 -- ── WalkSpeed (Persistent) ──────────────────────────────────────
 
 local WalkCons = {
@@ -227,47 +287,24 @@ local WalkCons = {
     charAdded = nil,
 }
 
-local function applyWalkSpeed()
-    local char = LocalPlayer.Character
-    if not char then return end
-    local hum = getHumanoid(char)
-    if not hum then return end
-
+local function applyWalkSpeed(humanoid)
+    if not humanoid then return end
     if State.WalkEnabled then
-        hum.WalkSpeed = State.WalkValue
-        -- Hook property change to override resets
-        if not WalkCons.property then
-            WalkCons.property = hum:GetPropertyChangedSignal("WalkSpeed"):Connect(applyWalkSpeed)
+        humanoid.WalkSpeed = State.WalkValue
+        if WalkCons.property then
+            WalkCons.property:Disconnect()
+            WalkCons.property = nil
         end
+        WalkCons.property = humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
+            applyWalkSpeed(humanoid)
+        end)
     else
-        hum.WalkSpeed = OriginalWalkSpeed
+        humanoid.WalkSpeed = OriginalWalkSpeed
         if WalkCons.property then
             WalkCons.property:Disconnect()
             WalkCons.property = nil
         end
     end
-end
-
-local function onWalkCharacterAdded(newChar)
-    task.wait(0.1)
-    applyWalkSpeed()
-    if State.WalkEnabled then
-        if not WalkCons.charAdded then
-            WalkCons.charAdded = LocalPlayer.CharacterAdded:Connect(onWalkCharacterAdded)
-        end
-    else
-        if WalkCons.charAdded then
-            WalkCons.charAdded:Disconnect()
-            WalkCons.charAdded = nil
-        end
-    end
-end
-
--- Initial WalkSpeed setup
-LocalPlayer.CharacterAdded:Connect(onWalkCharacterAdded)
-if LocalPlayer.Character then
-    task.wait(0.2)
-    onWalkCharacterAdded(LocalPlayer.Character)
 end
 
 -- ── Jump Power (Persistent) ─────────────────────────────────────
@@ -278,32 +315,34 @@ local JumpCons = {
     charAdded = nil,
 }
 
-local function applyJump()
-    local char = LocalPlayer.Character
-    if not char then return end
-    local hum = getHumanoid(char)
-    if not hum then return end
-
+local function applyJump(humanoid)
+    if not humanoid then return end
     if State.JumpEnabled then
         local val = State.JumpValue
-        if hum.UseJumpPower then
-            hum.JumpPower = val
+        if humanoid.UseJumpPower then
+            humanoid.JumpPower = val
         else
-            hum.JumpHeight = val
+            humanoid.JumpHeight = val
         end
-        -- Hook property changes to override resets
-        if not JumpCons.property then
-            JumpCons.property = hum:GetPropertyChangedSignal("JumpPower"):Connect(applyJump)
+        if JumpCons.property then
+            JumpCons.property:Disconnect()
+            JumpCons.property = nil
         end
-        if not JumpCons.property2 then
-            JumpCons.property2 = hum:GetPropertyChangedSignal("JumpHeight"):Connect(applyJump)
+        if JumpCons.property2 then
+            JumpCons.property2:Disconnect()
+            JumpCons.property2 = nil
         end
+        JumpCons.property = humanoid:GetPropertyChangedSignal("JumpPower"):Connect(function()
+            applyJump(humanoid)
+        end)
+        JumpCons.property2 = humanoid:GetPropertyChangedSignal("JumpHeight"):Connect(function()
+            applyJump(humanoid)
+        end)
     else
-        -- Reset to original
-        if hum.UseJumpPower then
-            hum.JumpPower = OriginalJumpPower
+        if humanoid.UseJumpPower then
+            humanoid.JumpPower = OriginalJumpPower
         else
-            hum.JumpHeight = OriginalJumpPower
+            humanoid.JumpHeight = OriginalJumpPower
         end
         if JumpCons.property then
             JumpCons.property:Disconnect()
@@ -316,54 +355,39 @@ local function applyJump()
     end
 end
 
-local function onJumpCharacterAdded(newChar)
-    task.wait(0.1)
-    applyJump()
-    if State.JumpEnabled then
-        if not JumpCons.charAdded then
-            JumpCons.charAdded = LocalPlayer.CharacterAdded:Connect(onJumpCharacterAdded)
-        end
-    else
-        if JumpCons.charAdded then
-            JumpCons.charAdded:Disconnect()
-            JumpCons.charAdded = nil
-        end
+-- ── Local Respawn Handler ────────────────────────────────────────
+
+local function onLocalCharacterAdded(newChar)
+    local humanoid = newChar:WaitForChild("Humanoid", 5)
+    if not humanoid then return end
+
+    saveOriginalValues()
+    applyWalkSpeed(humanoid)
+    applyJump(humanoid)
+
+    -- Force refresh ESP for all players on local respawn
+    if State.ESPEnabled then
+        task.wait(0.1)
+        refreshESP()
+        startUpdateLoop()
     end
 end
 
--- Initial Jump setup
-LocalPlayer.CharacterAdded:Connect(onJumpCharacterAdded)
+LocalPlayer.CharacterAdded:Connect(onLocalCharacterAdded)
+
+-- Initial setup if character already exists
 if LocalPlayer.Character then
     task.wait(0.2)
-    onJumpCharacterAdded(LocalPlayer.Character)
+    onLocalCharacterAdded(LocalPlayer.Character)
 end
-
--- ── Save original values on first load ──────────────────────────
-
-local function saveOriginalValues()
-    local char = LocalPlayer.Character
-    if char then
-        local hum = getHumanoid(char)
-        if hum then
-            OriginalWalkSpeed = hum.WalkSpeed
-            OriginalJumpPower = hum.UseJumpPower and hum.JumpPower or hum.JumpHeight or 50
-        end
-    end
-end
-
--- Wait for initial character to load
-task.spawn(function()
-    task.wait(1)
-    saveOriginalValues()
-end)
 
 -- ── UI Setup ────────────────────────────────────────────────────────
 
 local Window = Fluent:CreateWindow({
     Title = "Player Tools",
-    SubTitle = "ESP, WalkSpeed & Jump Power",
+    SubTitle = "ESP, WalkSpeed, Jump, Auto Refresh",
     TabWidth = 160,
-    Size = UDim2.fromOffset(520, 260),
+    Size = UDim2.fromOffset(520, 240),
     Acrylic = false,
     Theme = "Neon Purple",
     MinimizeKey = Enum.KeyCode.LeftAlt,
@@ -371,8 +395,8 @@ local Window = Fluent:CreateWindow({
 
 local PlayerTab = Window:AddTab({ Title = "Player", Icon = "user-cog" })
 
--- ESP Toggle
-PlayerTab:AddToggle("ESPToggle", {
+-- ESP Toggle (store reference)
+local ESPToggleRef = PlayerTab:AddToggle("ESPToggle", {
     Title = "ESP",
     Description = "Team‑based highlights: Green (ally) / Red (enemy)",
     Default = false,
@@ -391,6 +415,28 @@ PlayerTab:AddToggle("ESPToggle", {
     end,
 })
 
+-- Auto Refresh ESP Toggle
+PlayerTab:AddToggle("AutoRefreshToggle", {
+    Title = "Auto Refresh ESP",
+    Description = "Automatically refresh ESP every 5 seconds (off/on)",
+    Default = false,
+    Callback = function(enabled)
+        State.AutoRefreshEnabled = enabled
+        if enabled then
+            if autoRefreshConnection then
+                autoRefreshConnection:Disconnect()
+                autoRefreshConnection = nil
+            end
+            autoRefreshConnection = task.spawn(autoRefreshLoop)
+        else
+            if autoRefreshConnection then
+                task.cancel(autoRefreshConnection)
+                autoRefreshConnection = nil
+            end
+        end
+    end,
+})
+
 -- WalkSpeed Toggle
 PlayerTab:AddToggle("WalkToggle", {
     Title = "WalkSpeed",
@@ -398,30 +444,24 @@ PlayerTab:AddToggle("WalkToggle", {
     Default = false,
     Callback = function(enabled)
         State.WalkEnabled = enabled
-        applyWalkSpeed()
-        if enabled then
-            if not WalkCons.charAdded then
-                WalkCons.charAdded = LocalPlayer.CharacterAdded:Connect(onWalkCharacterAdded)
-            end
-        else
-            if WalkCons.charAdded then
-                WalkCons.charAdded:Disconnect()
-                WalkCons.charAdded = nil
-            end
-        end
+        local hum = getHumanoid(LocalPlayer.Character)
+        if hum then applyWalkSpeed(hum) end
     end,
 })
 
 PlayerTab:AddSlider("WalkSlider", {
     Title = "Walk Speed",
-    Description = "Adjust speed (default 16)",
+    Description = "Adjust speed (default 40)",
     Default = 40,
     Min = 1,
     Max = 60,
     Rounding = 1,
     Callback = function(value)
         State.WalkValue = value
-        if State.WalkEnabled then applyWalkSpeed() end
+        if State.WalkEnabled then
+            local hum = getHumanoid(LocalPlayer.Character)
+            if hum then applyWalkSpeed(hum) end
+        end
     end,
 })
 
@@ -432,17 +472,8 @@ PlayerTab:AddToggle("JumpToggle", {
     Default = false,
     Callback = function(enabled)
         State.JumpEnabled = enabled
-        applyJump()
-        if enabled then
-            if not JumpCons.charAdded then
-                JumpCons.charAdded = LocalPlayer.CharacterAdded:Connect(onJumpCharacterAdded)
-            end
-        else
-            if JumpCons.charAdded then
-                JumpCons.charAdded:Disconnect()
-                JumpCons.charAdded = nil
-            end
-        end
+        local hum = getHumanoid(LocalPlayer.Character)
+        if hum then applyJump(hum) end
     end,
 })
 
@@ -455,7 +486,10 @@ PlayerTab:AddSlider("JumpSlider", {
     Rounding = 0,
     Callback = function(value)
         State.JumpValue = value
-        if State.JumpEnabled then applyJump() end
+        if State.JumpEnabled then
+            local hum = getHumanoid(LocalPlayer.Character)
+            if hum then applyJump(hum) end
+        end
     end,
 })
 
@@ -523,7 +557,7 @@ end)
 
 Fluent:Notify({
     Title = "Player Tab Loaded",
-    Content = "ESP (team), WalkSpeed & Jump Power ready.",
+    Content = "ESP (team), WalkSpeed, Jump, Auto Refresh ready.",
     Duration = 3,
 })
 
