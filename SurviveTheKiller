@@ -1,0 +1,530 @@
+-- ======================================================================
+-- Player Tab – ESP (Team Aware) + WalkSpeed + Jump Power
+-- Distance on top, Name below. Labels elevated for visibility.
+-- ======================================================================
+
+print("Player Tab script started")
+
+-- ── Load Fluent UI ──────────────────────────────────────────────────
+local Fluent = loadstring(game:HttpGet(
+    "https://github.com/StyearX/Fluent-modded/releases/download/1.5.1/FluentPro"
+))()
+
+-- ── Services ─────────────────────────────────────────────────────────
+-- ── Services ─────────────────────────────────────────────────
+local Services = {
+    RunService           = game:GetService("RunService"),
+    UserInputService     = game:GetService("UserInputService"),
+    ProximityPrompt      = game:GetService("ProximityPromptService")
+}
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local CoreGui = game:GetService("CoreGui")
+
+local LocalPlayer = Players.LocalPlayer
+
+-- ── Helpers ──────────────────────────────────────────────────
+Services.ProximityPrompt.PromptButtonHoldBegan:Connect(function(prompt)
+    pcall(function()
+        prompt.HoldDuration = 0
+        prompt:InputHoldBegin()
+        task.spawn(function()
+            task.wait(0.05)
+            prompt:InputHoldEnd()
+        end)
+    end)
+end)
+Services.ProximityPrompt.PromptTriggered:Connect(function(prompt)
+    -- print("[PoC] Prompt Triggered (instant):", prompt:GetFullName())
+end)
+
+-- ── State ────────────────────────────────────────────────────────────
+local State = {
+    ESPEnabled = false,
+    WalkEnabled = false,
+    WalkValue = 40,
+    JumpEnabled = false,
+    JumpValue = 20,
+}
+
+-- Store original values to restore on toggle off
+local OriginalWalkSpeed = 16
+local OriginalJumpPower = 50
+
+-- ── ESP Data ──────────────────────────────────────────────────────
+local ESPData = {}
+
+-- ── Helper Functions ──────────────────────────────────────────────
+
+local function getRoot(character)
+    return character and character:FindFirstChild("HumanoidRootPart")
+end
+
+local function getHumanoid(character)
+    return character and character:FindFirstChildOfClass("Humanoid")
+end
+
+local function isTeammate(plr)
+    return plr.TeamColor == LocalPlayer.TeamColor and LocalPlayer.TeamColor ~= BrickColor.new("White")
+end
+
+-- ── ESP Creation ──────────────────────────────────────────────────
+
+local function createESPForPlayer(plr)
+    if plr == LocalPlayer then return end
+    -- Remove old ESP if exists
+    if ESPData[plr] then
+        local data = ESPData[plr]
+        if data.Highlight then data.Highlight:Destroy() end
+        if data.Billboard then data.Billboard:Destroy() end
+        ESPData[plr] = nil
+    end
+
+    local char = plr.Character
+    if not char then return end
+    local root = getRoot(char)
+    if not root then return end
+
+    -- Highlight with team color
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "ESP_Highlight"
+    highlight.Parent = char
+    if isTeammate(plr) then
+        highlight.FillColor = Color3.fromRGB(0, 255, 0)   -- Green
+    else
+        highlight.FillColor = Color3.fromRGB(255, 50, 50) -- Red
+    end
+    highlight.FillTransparency = 0.4
+    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    highlight.OutlineTransparency = 0.2
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+
+    -- BillboardGui (Distance on top, Name below)
+    local head = char:FindFirstChild("Head")
+    if not head then return end
+
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "ESP_Billboard"
+    billboard.Parent = CoreGui
+    billboard.Adornee = head
+    billboard.Size = UDim2.new(0, 200, 0, 70)      -- taller to fit two lines
+    billboard.StudsOffset = Vector3.new(0, 4.5, 0) -- higher for visibility
+    billboard.AlwaysOnTop = true
+
+    local label = Instance.new("TextLabel")
+    label.Parent = billboard
+    label.BackgroundTransparency = 1
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 16
+    label.TextColor3 = Color3.new(1, 1, 1)
+    label.TextStrokeTransparency = 0.5
+    label.TextStrokeColor3 = Color3.new(0, 0, 0)
+    label.TextYAlignment = Enum.TextYAlignment.Top    -- align to top of billboard
+    label.Text = "0\n" .. plr.Name                    -- distance top, name bottom
+
+    ESPData[plr] = {
+        Highlight = highlight,
+        Billboard = billboard,
+        Label = label,
+        Character = char,
+    }
+end
+
+-- ── Remove ESP ──────────────────────────────────────────────────
+
+local function removeESPForPlayer(plr)
+    local data = ESPData[plr]
+    if data then
+        if data.Highlight then data.Highlight:Destroy() end
+        if data.Billboard then data.Billboard:Destroy() end
+        ESPData[plr] = nil
+    end
+end
+
+-- ── Update all ESP labels (distance) ──────────────────────────────
+
+local function updateAllESP()
+    if not State.ESPEnabled then return end
+    local myChar = LocalPlayer.Character
+    local myRoot = myChar and getRoot(myChar)
+    if not myRoot then return end
+
+    for plr, data in pairs(ESPData) do
+        -- Recreate if character changed
+        if plr.Character ~= data.Character then
+            createESPForPlayer(plr)
+            data = ESPData[plr]
+            if not data then continue end
+        end
+
+        local targetRoot = getRoot(plr.Character)
+        if targetRoot then
+            local dist = math.floor((myRoot.Position - targetRoot.Position).Magnitude)
+            data.Label.Text = dist .. "\n" .. plr.Name
+        end
+    end
+end
+
+-- ── Refresh ESP ──────────────────────────────────────────────────
+
+local function refreshESP()
+    for plr in pairs(ESPData) do removeESPForPlayer(plr) end
+    if State.ESPEnabled then
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr ~= LocalPlayer then createESPForPlayer(plr) end
+        end
+    end
+end
+
+-- ── Event Listeners ──────────────────────────────────────────────
+
+Players.PlayerAdded:Connect(function(plr)
+    if State.ESPEnabled and plr ~= LocalPlayer then createESPForPlayer(plr) end
+end)
+
+Players.PlayerRemoving:Connect(function(plr)
+    removeESPForPlayer(plr)
+end)
+
+local function onCharacterAdded(plr)
+    if State.ESPEnabled and plr ~= LocalPlayer then createESPForPlayer(plr) end
+end
+
+for _, plr in ipairs(Players:GetPlayers()) do
+    if plr ~= LocalPlayer then
+        plr.CharacterAdded:Connect(function()
+            onCharacterAdded(plr)
+        end)
+    end
+end
+
+-- ── Throttled Update Loop ────────────────────────────────────────
+
+local updateConnection
+local lastUpdateTime = 0
+
+local function startUpdateLoop()
+    if updateConnection then
+        updateConnection:Disconnect()
+        updateConnection = nil
+    end
+    if State.ESPEnabled then
+        updateConnection = RunService.Stepped:Connect(function()
+            local now = tick()
+            if now - lastUpdateTime >= 0.5 then
+                lastUpdateTime = now
+                updateAllESP()
+            end
+        end)
+    end
+end
+
+-- ── WalkSpeed (Persistent) ──────────────────────────────────────
+
+local WalkCons = {
+    property = nil,
+    charAdded = nil,
+}
+
+local function applyWalkSpeed()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hum = getHumanoid(char)
+    if not hum then return end
+
+    if State.WalkEnabled then
+        hum.WalkSpeed = State.WalkValue
+        -- Hook property change to override resets
+        if not WalkCons.property then
+            WalkCons.property = hum:GetPropertyChangedSignal("WalkSpeed"):Connect(applyWalkSpeed)
+        end
+    else
+        hum.WalkSpeed = OriginalWalkSpeed
+        if WalkCons.property then
+            WalkCons.property:Disconnect()
+            WalkCons.property = nil
+        end
+    end
+end
+
+local function onWalkCharacterAdded(newChar)
+    task.wait(0.1)
+    applyWalkSpeed()
+    if State.WalkEnabled then
+        if not WalkCons.charAdded then
+            WalkCons.charAdded = LocalPlayer.CharacterAdded:Connect(onWalkCharacterAdded)
+        end
+    else
+        if WalkCons.charAdded then
+            WalkCons.charAdded:Disconnect()
+            WalkCons.charAdded = nil
+        end
+    end
+end
+
+-- Initial WalkSpeed setup
+LocalPlayer.CharacterAdded:Connect(onWalkCharacterAdded)
+if LocalPlayer.Character then
+    task.wait(0.2)
+    onWalkCharacterAdded(LocalPlayer.Character)
+end
+
+-- ── Jump Power (Persistent) ─────────────────────────────────────
+
+local JumpCons = {
+    property = nil,
+    property2 = nil,
+    charAdded = nil,
+}
+
+local function applyJump()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hum = getHumanoid(char)
+    if not hum then return end
+
+    if State.JumpEnabled then
+        local val = State.JumpValue
+        if hum.UseJumpPower then
+            hum.JumpPower = val
+        else
+            hum.JumpHeight = val
+        end
+        -- Hook property changes to override resets
+        if not JumpCons.property then
+            JumpCons.property = hum:GetPropertyChangedSignal("JumpPower"):Connect(applyJump)
+        end
+        if not JumpCons.property2 then
+            JumpCons.property2 = hum:GetPropertyChangedSignal("JumpHeight"):Connect(applyJump)
+        end
+    else
+        -- Reset to original
+        if hum.UseJumpPower then
+            hum.JumpPower = OriginalJumpPower
+        else
+            hum.JumpHeight = OriginalJumpPower
+        end
+        if JumpCons.property then
+            JumpCons.property:Disconnect()
+            JumpCons.property = nil
+        end
+        if JumpCons.property2 then
+            JumpCons.property2:Disconnect()
+            JumpCons.property2 = nil
+        end
+    end
+end
+
+local function onJumpCharacterAdded(newChar)
+    task.wait(0.1)
+    applyJump()
+    if State.JumpEnabled then
+        if not JumpCons.charAdded then
+            JumpCons.charAdded = LocalPlayer.CharacterAdded:Connect(onJumpCharacterAdded)
+        end
+    else
+        if JumpCons.charAdded then
+            JumpCons.charAdded:Disconnect()
+            JumpCons.charAdded = nil
+        end
+    end
+end
+
+-- Initial Jump setup
+LocalPlayer.CharacterAdded:Connect(onJumpCharacterAdded)
+if LocalPlayer.Character then
+    task.wait(0.2)
+    onJumpCharacterAdded(LocalPlayer.Character)
+end
+
+-- ── Save original values on first load ──────────────────────────
+
+local function saveOriginalValues()
+    local char = LocalPlayer.Character
+    if char then
+        local hum = getHumanoid(char)
+        if hum then
+            OriginalWalkSpeed = hum.WalkSpeed
+            OriginalJumpPower = hum.UseJumpPower and hum.JumpPower or hum.JumpHeight or 50
+        end
+    end
+end
+
+-- Wait for initial character to load
+task.spawn(function()
+    task.wait(1)
+    saveOriginalValues()
+end)
+
+-- ── UI Setup ────────────────────────────────────────────────────────
+
+local Window = Fluent:CreateWindow({
+    Title = "Player Tools",
+    SubTitle = "ESP, WalkSpeed & Jump Power",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(520, 260),
+    Acrylic = false,
+    Theme = "Neon Purple",
+    MinimizeKey = Enum.KeyCode.LeftAlt,
+})
+
+local PlayerTab = Window:AddTab({ Title = "Player", Icon = "user-cog" })
+
+-- ESP Toggle
+PlayerTab:AddToggle("ESPToggle", {
+    Title = "ESP",
+    Description = "Team‑based highlights: Green (ally) / Red (enemy)",
+    Default = false,
+    Callback = function(enabled)
+        State.ESPEnabled = enabled
+        if enabled then
+            refreshESP()
+            startUpdateLoop()
+        else
+            for plr in pairs(ESPData) do removeESPForPlayer(plr) end
+            if updateConnection then
+                updateConnection:Disconnect()
+                updateConnection = nil
+            end
+        end
+    end,
+})
+
+-- WalkSpeed Toggle
+PlayerTab:AddToggle("WalkToggle", {
+    Title = "WalkSpeed",
+    Description = "Persistent walk speed modification",
+    Default = false,
+    Callback = function(enabled)
+        State.WalkEnabled = enabled
+        applyWalkSpeed()
+        if enabled then
+            if not WalkCons.charAdded then
+                WalkCons.charAdded = LocalPlayer.CharacterAdded:Connect(onWalkCharacterAdded)
+            end
+        else
+            if WalkCons.charAdded then
+                WalkCons.charAdded:Disconnect()
+                WalkCons.charAdded = nil
+            end
+        end
+    end,
+})
+
+PlayerTab:AddSlider("WalkSlider", {
+    Title = "Walk Speed",
+    Description = "Adjust speed (default 16)",
+    Default = 40,
+    Min = 1,
+    Max = 100,
+    Rounding = 1,
+    Callback = function(value)
+        State.WalkValue = value
+        if State.WalkEnabled then applyWalkSpeed() end
+    end,
+})
+
+-- Jump Power Toggle
+PlayerTab:AddToggle("JumpToggle", {
+    Title = "Jump Power",
+    Description = "Persistent jump modification (resists resets)",
+    Default = false,
+    Callback = function(enabled)
+        State.JumpEnabled = enabled
+        applyJump()
+        if enabled then
+            if not JumpCons.charAdded then
+                JumpCons.charAdded = LocalPlayer.CharacterAdded:Connect(onJumpCharacterAdded)
+            end
+        else
+            if JumpCons.charAdded then
+                JumpCons.charAdded:Disconnect()
+                JumpCons.charAdded = nil
+            end
+        end
+    end,
+})
+
+PlayerTab:AddSlider("JumpSlider", {
+    Title = "Jump Value",
+    Description = "JumpPower or JumpHeight (depending on game)",
+    Default = 20,
+    Min = 0,
+    Max = 60,
+    Rounding = 0,
+    Callback = function(value)
+        State.JumpValue = value
+        if State.JumpEnabled then applyJump() end
+    end,
+})
+
+-- ── Mobile UI Toggle ─────────────────────────────────────────────
+
+local CoreGui = game:GetService("CoreGui")
+local existing = CoreGui:FindFirstChild("MobileButtonUI")
+if existing then existing:Destroy() end
+
+local mobileGui = Instance.new("ScreenGui")
+mobileGui.Name = "MobileButtonUI"
+mobileGui.Parent = CoreGui
+
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Name = "Toggle"
+toggleBtn.Parent = mobileGui
+toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+toggleBtn.Position = UDim2.new(0.5, -25, 0.1, 0)
+toggleBtn.Size = UDim2.new(0, 50, 0, 50)
+toggleBtn.Font = Enum.Font.GothamBold
+toggleBtn.Text = "P"
+toggleBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
+toggleBtn.TextSize = 35
+toggleBtn.Active = true
+toggleBtn.Draggable = true
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(1, 0)
+corner.Parent = toggleBtn
+
+local stroke = Instance.new("UIStroke")
+stroke.Color = Color3.fromRGB(0, 255, 0)
+stroke.Thickness = 1.5
+stroke.Parent = toggleBtn
+
+local fluentScreenGui
+task.spawn(function()
+    while not fluentScreenGui do
+        task.wait(0.5)
+        for _, gui in pairs(CoreGui:GetChildren()) do
+            if gui:IsA("ScreenGui") then
+                for _, descendant in pairs(gui:GetDescendants()) do
+                    if descendant:IsA("TextLabel") and string.find(descendant.Text, "Player Tools") then
+                        fluentScreenGui = gui
+                        break
+                    end
+                end
+            end
+            if fluentScreenGui then break end
+        end
+    end
+end)
+
+toggleBtn.MouseButton1Click:Connect(function()
+    if fluentScreenGui then
+        for _, child in pairs(fluentScreenGui:GetChildren()) do
+            if child:IsA("Frame") or child:IsA("CanvasGroup") then
+                child.Visible = not child.Visible
+            end
+        end
+    end
+end)
+
+-- ── Notify ──────────────────────────────────────────────────────────
+
+Fluent:Notify({
+    Title = "Player Tab Loaded",
+    Content = "ESP (team), WalkSpeed & Jump Power ready.",
+    Duration = 3,
+})
+
+print("Player Tab script finished loading")
